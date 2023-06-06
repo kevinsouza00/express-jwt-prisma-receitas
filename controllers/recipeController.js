@@ -1,41 +1,50 @@
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
-const recipes = [];
-
-
-function listRecipes(req, res) {
-    const userRecipes = recipes.filter((recipe) => recipe.userId === req.user.id);
-    res.json(userRecipes);
+async function listRecipes(req, res) {
+    const r = await prisma.recipe.findMany({
+        where: {
+            userId: req.usuarioId
+        }
+    })
+    res.json(r);
 }
 
 
-function createRecipe(req, res) {
+async function createRecipe(req, res) {
     const { name, description, preparationTime } = req.body;
 
-
-    const recipe = {
-        id: recipes.length + 1,
-        name,
-        description,
-        preparationTime,
-        userId: req.user.id,
-    };
-    recipes.push(recipe);
+    await prisma.recipe.create({
+        data: {
+            name: name,
+            description: description,
+            preparationTime: preparationTime,
+            user: {
+                connect: {
+                    id: req.usuarioId
+                }
+            }
+        }
+    });
 
     res.status(201).json({ message: 'Receita criada com sucesso' });
 }
 
 
-function getRecipe(req, res) {
+async function getRecipe(req, res) {
     const { id } = req.params;
 
-
-    const recipe = recipes.find((recipe) => recipe.id === parseInt(id));
+    const recipe = await prisma.recipe.findFirst({
+        where: {
+            id: Number(id)
+        }
+    })
     if (!recipe) {
         return res.status(404).json({ error: 'Receita não encontrada' });
     }
 
 
-    if (recipe.userId !== req.user.id) {
+    if (recipe.userId !== req.usuarioId) {
         return res.status(403).json({ error: 'Acesso não autorizado' });
     }
 
@@ -43,46 +52,48 @@ function getRecipe(req, res) {
 }
 
 
-function updateRecipe(req, res) {
+async function updateRecipe(req, res) {
     const { id } = req.params;
     const { name, description, preparationTime } = req.body;
 
-
-    const recipe = recipes.find((recipe) => recipe.id === parseInt(id));
+    const recipe = await prisma.recipe.findUnique({
+        where: {
+            id: Number(id),
+        }
+    })
+    //const recipe = recipes.find((recipe) => recipe.id === parseInt(id));
     if (!recipe) {
         return res.status(404).json({ error: 'Receita não encontrada' });
     }
 
 
-    if (recipe.userId !== req.user.id) {
+    if (recipe.userId !== req.usuarioId) {
         return res.status(403).json({ error: 'Acesso não autorizado' });
     }
-
 
     recipe.name = name;
     recipe.description = description;
     recipe.preparationTime = preparationTime;
 
+    await prisma.recipe.update(
+        {
+            where: { id: Number(recipe.id) },
+            data: recipe,
+        },
+    );
+
     res.json({ message: 'Receita atualizada com sucesso' });
 }
 
 
-function deleteRecipe(req, res) {
+async function deleteRecipe(req, res) {
     const { id } = req.params;
 
-
-    const recipeIndex = recipes.findIndex((recipe) => recipe.id === parseInt(id));
-    if (recipeIndex === -1) {
-        return res.status(404).json({ error: 'Receita não encontrada' });
-    }
-
-
-    if (recipes[recipeIndex].userId !== req.user.id) {
-        return res.status(403).json({ error: 'Acesso não autorizado' });
-    }
-
-
-    recipes.splice(recipeIndex, 1);
+    await prisma.recipe.delete({
+        where: {
+            id: Number(id),
+        }
+    })
 
     res.json({ message: 'Receita excluída com sucesso' });
 }
